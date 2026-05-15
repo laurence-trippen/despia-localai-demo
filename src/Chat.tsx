@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 export interface Message {
   id: string;
   role: string | "system" | "user";
@@ -7,8 +5,7 @@ export interface Message {
 }
 
 function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-
+  // const [messages, setMessages] = useState<Message[]>([]);
   return <div>Chat</div>;
 }
 
