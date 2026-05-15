@@ -5,17 +5,23 @@ import { Theme } from "@radix-ui/themes";
 
 import IntelligenceGuard from "./lib/IntelligenceGuard.tsx";
 import IntelligenceProvider from "./lib/IntelligenceProvider.tsx";
-import SinglePromptApp from "./SinglePromptApp.tsx";
+import ChatApp from "./ChatApp.tsx";
+import { installFakeBridge } from "./lib/FakeBridge.ts";
+
 import "@radix-ui/themes/styles.css";
+
+if (import.meta.env.DEV) {
+  installFakeBridge();
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Theme>
       <IntelligenceGuard>
         <IntelligenceProvider>
-          <SinglePromptApp />
+          <ChatApp />
         </IntelligenceProvider>
       </IntelligenceGuard>
     </Theme>
-  </StrictMode>
+  </StrictMode>,
 );

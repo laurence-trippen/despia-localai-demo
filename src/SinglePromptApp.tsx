@@ -39,7 +39,11 @@ function SinglePromptApp() {
           const params = new URLSearchParams();
           params.append("q", args.cityName);
           params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
-          const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params}`);
+
+          const res = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?${params}`,
+          );
+          
           const data = await res.json();
           return data["weather"][0] ?? "N/A";
         } catch {
@@ -79,7 +83,10 @@ function SinglePromptApp() {
       setError(null);
     };
 
-    window.intelligence.onDownloadProgress = (_modelId: string, progress: number) => {
+    window.intelligence.onDownloadProgress = (
+      _modelId: string,
+      progress: number,
+    ) => {
       setDownloadProgress(progress);
     };
 
@@ -122,7 +129,9 @@ function SinglePromptApp() {
     window.intelligence.completion({
       id,
       model: selectedModelId,
-      messages: [{ role: "user", content: promptText }],
+      messages: [
+        { id: crypto.randomUUID(), role: "user", content: promptText },
+      ],
       stream: true,
     });
   }
@@ -155,7 +164,9 @@ function SinglePromptApp() {
             <Select.Trigger placeholder="Modell wählen..." />
             <Select.Content>
               {availableModels.map((model) => {
-                const installed = installedModels.some((m) => m.id === model.id);
+                const installed = installedModels.some(
+                  (m) => m.id === model.id,
+                );
                 return (
                   <Select.Item key={model.id} value={model.id}>
                     <Flex align="center" gap="2">
@@ -180,10 +191,20 @@ function SinglePromptApp() {
 
         {/* Download area */}
         {selectedModelId && !isInstalled && (
-          <Box p="4" style={{ border: "1px solid var(--gray-5)", borderRadius: "var(--radius-3)" }}>
+          <Box
+            p="4"
+            style={{
+              border: "1px solid var(--gray-5)",
+              borderRadius: "var(--radius-3)",
+            }}
+          >
             <Flex direction="column" gap="3">
               <Text size="2">Dieses Modell ist noch nicht installiert.</Text>
-              <Button onClick={handleDownload} disabled={isDownloading} variant="soft">
+              <Button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                variant="soft"
+              >
                 {isDownloading ? (
                   <>
                     <Spinner /> Wird heruntergeladen...
@@ -220,7 +241,13 @@ function SinglePromptApp() {
                 onClick={handleSubmit}
                 disabled={isStreaming || !promptText.trim()}
               >
-                {isStreaming ? <><Spinner /> Generiert...</> : "Senden"}
+                {isStreaming ? (
+                  <>
+                    <Spinner /> Generiert...
+                  </>
+                ) : (
+                  "Senden"
+                )}
               </Button>
             </Flex>
           </Flex>

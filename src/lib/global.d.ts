@@ -37,9 +37,9 @@ declare global {
   }
 
   interface Model {
-    id: string,
-    name: string,
-    category: string,
+    id: string;
+    name: string;
+    category: string;
   }
 
   interface Window {
@@ -54,7 +54,11 @@ declare global {
       completion: (payload: {
         id: string;
         model: string;
-        messages: { role: "system" | "user" | string; content: string }[];
+        messages: {
+          id: string;
+          role: "system" | "user" | "assistant" | "tool";
+          content: string;
+        }[];
         stream: boolean;
         tools?: CompletionToolSchema[];
         max_tokens?: number;
