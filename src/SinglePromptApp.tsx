@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import { defineTool } from "./lib/intelligence";
 import {
   Badge,
   Box,
@@ -13,7 +14,7 @@ import {
   Text,
   TextArea,
 } from "@radix-ui/themes";
-import { IntelligenceContext } from "./IntelligenceContext";
+import { IntelligenceContext } from "./lib/IntelligenceContext";
 
 function SinglePromptApp() {
   const { availableModels, installedModels, getAllModels, getInstalledModels } =
@@ -31,6 +32,31 @@ function SinglePromptApp() {
 
   useEffect(() => {
     getAllModels();
+
+    window.intelligence.tools.get_weather_by_city = defineTool(
+      async (args: { cityName: string }) => {
+        try {
+          const params = new URLSearchParams();
+          params.append("q", args.cityName);
+          params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
+          const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params}`);
+          const data = await res.json();
+          return data["weather"][0] ?? "N/A";
+        } catch {
+          return "N/A";
+        }
+      },
+      {
+        description: "Get weather for a city.",
+        parameters: {
+          type: "object",
+          properties: {
+            location: { type: "string", description: "city" },
+          },
+          required: ["location"],
+        },
+      },
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     window.intelligence.onMLToken = (_jobId: string, ...rest: any[]) => {
