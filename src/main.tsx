@@ -3,10 +3,12 @@ import { createRoot } from "react-dom/client";
 
 import { Theme } from "@radix-ui/themes";
 
-import App from "./App.tsx";
+import IntelligenceGuard from "./IntelligenceGuard.tsx";
+import IntelligenceProvider from "./IntelligenceProvider.tsx";
+import SinglePromptApp from "./SinglePromptApp.tsx";
+import { defineTool } from "./lib/intelligence.ts";
 
 import "@radix-ui/themes/styles.css";
-import { defineTool } from "./lib/intelligence.ts";
 
 window.intelligence.tools.get_weather_by_city = defineTool(
   async (args: { cityName: string }) => {
@@ -41,7 +43,11 @@ window.intelligence.tools.get_weather_by_city = defineTool(
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Theme>
-      <App />
+      <IntelligenceGuard>
+        <IntelligenceProvider>
+          <SinglePromptApp />
+        </IntelligenceProvider>
+      </IntelligenceGuard>
     </Theme>
-  </StrictMode>,
+  </StrictMode>
 );
