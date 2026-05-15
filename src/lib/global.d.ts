@@ -57,6 +57,21 @@ declare global {
         messages: { role: "system" | "user" | string; content: string }[];
         stream: boolean;
         tools?: CompletionToolSchema[];
+        max_tokens?: number;
+        temperature?: number;
+        top_p?: number;
+        top_k?: number;
+        min_p?: number;
+        repetition_penalty?: number;
+        stop_sequences?: Array<unknown>;
+        include_stop_sequences?: boolean;
+        force_tools?: boolean;
+        tool_rag_top_k?: number;
+        confidence_threshold?: number;
+        auto_handoff?: boolean;
+        cloud_timeout_ms?: number;
+        handoff_with_images?: boolean;
+        enable_thinking_if_supported?: boolean;
       }) => void;
 
       listModels: (payload: { query: "all" | "installed" }) => void;
