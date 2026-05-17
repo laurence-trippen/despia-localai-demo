@@ -34,16 +34,16 @@ function SinglePromptApp() {
     getAllModels();
 
     window.intelligence.tools.get_weather_by_city = defineTool(
-      async (args: { cityName: string }) => {
+      async (args: { location: string }) => {
         try {
           const params = new URLSearchParams();
-          params.append("q", args.cityName);
+          params.append("q", args.location);
           params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
 
           const res = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?${params}`,
           );
-          
+
           const data = await res.json();
           return data["weather"][0] ?? "N/A";
         } catch {
@@ -62,18 +62,23 @@ function SinglePromptApp() {
       },
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window.intelligence.onMLToken = (_jobId: string, ...rest: any[]) => {
-      const token: string | undefined = rest[0];
-      if (token) setResponse((prev) => prev + token);
+    window.intelligence.onMLToken = (_jobId, snapshot) => {
+      const textBlock = snapshot.find(
+        (b): b is ContentBlock => b.type === "content" && b.format === "string",
+      );
+      if (textBlock) setResponse(textBlock.content as string);
     };
 
-    window.intelligence.onMLComplete = () => {
+    window.intelligence.onMLComplete = (_jobId, snapshot) => {
+      const textBlock = snapshot.find(
+        (b): b is ContentBlock => b.type === "content" && b.format === "string",
+      );
+      if (textBlock) setResponse(textBlock.content as string);
       setIsStreaming(false);
     };
 
-    window.intelligence.onMLError = (err: string) => {
-      setError(err);
+    window.intelligence.onMLError = (err) => {
+      setError(err.errorMessage);
       setIsStreaming(false);
     };
 
@@ -83,10 +88,7 @@ function SinglePromptApp() {
       setError(null);
     };
 
-    window.intelligence.onDownloadProgress = (
-      _modelId: string,
-      progress: number,
-    ) => {
+    window.intelligence.onDownloadProgress = (_modelId, progress) => {
       setDownloadProgress(progress);
     };
 
@@ -95,7 +97,7 @@ function SinglePromptApp() {
       getInstalledModels();
     };
 
-    window.intelligence.onDownloadError = (_modelId: string, err: string) => {
+    window.intelligence.onDownloadError = (_modelId, err) => {
       setError(err);
       setIsDownloading(false);
     };
@@ -129,15 +131,13 @@ function SinglePromptApp() {
     window.intelligence.completion({
       id,
       model: selectedModelId,
-      messages: [
-        { id: crypto.randomUUID(), role: "user", content: promptText },
-      ],
+      messages: [{ role: "user", content: promptText }],
       stream: true,
     });
   }
 
   function handleCancel() {
-    window.intelligence.cancel();
+    window.intelligence.cancel({ id: jobIdRef.current });
     setIsStreaming(false);
   }
 

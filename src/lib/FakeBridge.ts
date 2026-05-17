@@ -23,10 +23,25 @@ export function installFakeBridge() {
     completion(payload) {
       console.log("[FakeBridge] completion called", payload);
 
-      setTimeout(() => {
-        window.intelligence.onMLToken?.(payload.id);
-        window.intelligence.onMLComplete?.(payload.id);
-      }, 500);
+      const fakeTokens = ["Hello", " from", " the", " FakeBridge", "."];
+      let accumulated = "";
+      let i = 0;
+
+      const streamInterval = setInterval(() => {
+        if (i >= fakeTokens.length) {
+          clearInterval(streamInterval);
+          const finalSnapshot: Block[] = [
+            { type: "content", format: "string", content: accumulated },
+          ];
+          window.intelligence.onMLComplete?.(payload.id, finalSnapshot);
+          return;
+        }
+        accumulated += fakeTokens[i++];
+        const snapshot: Block[] = [
+          { type: "content", format: "string", content: accumulated },
+        ];
+        window.intelligence.onMLToken?.(payload.id, snapshot);
+      }, 120);
     },
 
     listModels(payload) {
@@ -70,8 +85,8 @@ export function installFakeBridge() {
       }, 200);
     },
 
-    cancel() {
-      console.log("[FakeBridge] cancel called");
+    cancel(payload) {
+      console.log("[FakeBridge] cancel called", payload);
     },
   };
 }

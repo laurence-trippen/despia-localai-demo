@@ -12,13 +12,19 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 
 export interface Message {
-  id: string;
-  role: "system" | "user" | string;
-  content: string;
+  id: string; // React key only — not sent to completion()
+  role: "system" | "user" | "assistant";
+  content: string | Block[];
 }
 
 function ChatBubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const text = typeof message.content === "string"
+    ? message.content
+    : (message.content as Block[])
+        .filter((b): b is ContentBlock => b.type === "content" && b.format === "string")
+        .map((b) => b.content as string)
+        .join("");
 
   return (
     <Flex justify={isUser ? "start" : "end"}>
@@ -28,7 +34,7 @@ function ChatBubble({ message }: { message: Message }) {
           backgroundColor: isUser ? "var(--accent-3)" : "var(--gray-3)",
         }}
       >
-        <Text size="2">{message.content}</Text>
+        <Text size="2">{text}</Text>
       </Card>
     </Flex>
   );
@@ -61,18 +67,38 @@ function ChatApp() {
   }, [messages]);
 
   useEffect(() => {
-    window.intelligence.onMLToken = (jobId) => {
+    window.intelligence.onMLToken = (_jobId, snapshot) => {
+      const textBlock = snapshot.find(
+        (b): b is ContentBlock => b.type === "content" && b.format === "string",
+      );
+      if (!textBlock) return;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return [...prev.slice(0, -1), { ...last, content: textBlock.content as string }];
+        }
+        return [...prev, { id: crypto.randomUUID(), role: "assistant", content: textBlock.content as string }];
+      });
+    };
 
-    }
-
-    window.intelligence.onMLComplete = (jobId) => {
-
-    }
+    window.intelligence.onMLComplete = (_jobId, snapshot) => {
+      const textBlock = snapshot.find(
+        (b): b is ContentBlock => b.type === "content" && b.format === "string",
+      );
+      if (!textBlock) return;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return [...prev.slice(0, -1), { ...last, content: textBlock.content as string }];
+        }
+        return [...prev, { id: crypto.randomUUID(), role: "assistant", content: textBlock.content as string }];
+      });
+    };
 
     return () => {
-      window.intelligence.onMLToken = undefined
-      window.intelligence.onMLComplete = undefined
-    }
+      window.intelligence.onMLToken = undefined;
+      window.intelligence.onMLComplete = undefined;
+    };
   }, []);
 
   const sendMessage = () => {
@@ -84,9 +110,11 @@ function ChatApp() {
       { id: crypto.randomUUID(), role: "user", content: trimmed },
     ]);
 
+    // Strip the local React `id` before sending to native
     window.intelligence.completion({
       id: jobId,
-      messages,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      messages: messages.map(({ id: _id, ...rest }) => rest as CompletionMessage),
       stream: true,
       model: "qwen3_0_6b",
     });
