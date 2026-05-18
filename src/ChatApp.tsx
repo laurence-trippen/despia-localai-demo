@@ -1,6 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import {
-  Badge,
   Box,
   Card,
   Container,
@@ -18,63 +17,61 @@ export interface Message {
   content: string | Block[];
 }
 
-function ToolPill({ block }: { block: ToolBlock }) {
-  const icon =
-    block.status === "done"
-      ? "✓"
-      : block.status === "failed"
-        ? "✗"
-        : "⟳";
+const toolStatusConfig = {
+  loading: { icon: "⟳", bg: "var(--gray-3)", fg: "var(--gray-11)" },
+  ready:   { icon: "⟳", bg: "var(--blue-3)", fg: "var(--blue-11)" },
+  done:    { icon: "✓", bg: "var(--green-3)", fg: "var(--green-11)" },
+  failed:  { icon: "✗", bg: "var(--red-3)",   fg: "var(--red-11)"  },
+} as const;
 
+function ToolBubble({ block }: { block: ToolBlock }) {
+  const { icon, bg, fg } = toolStatusConfig[block.status];
   const label =
-    block.status === "failed"
-      ? `${block.name}: ${block.error ?? "error"}`
-      : block.status === "ready"
-        ? `Führt ${block.name} aus…`
-        : block.status === "loading"
-          ? `${block.name}…`
-          : block.name;
-
-  const color =
-    block.status === "done"
-      ? "green"
-      : block.status === "failed"
-        ? "red"
-        : "gray";
+    block.status === "loading" ? `${block.name}…` :
+    block.status === "ready"   ? `Führt ${block.name} aus…` :
+    block.name;
 
   return (
-    <Badge color={color} size="1">
-      {icon} {label}
-    </Badge>
+    <Flex justify="center">
+      <Box
+        style={{
+          backgroundColor: bg,
+          borderRadius: "8px",
+          padding: "8px 12px",
+          maxWidth: "75%",
+          minWidth: "160px",
+        }}
+      >
+        <Flex direction="column" gap="1">
+          <Text size="1" weight="bold" style={{ color: fg, fontFamily: "monospace" }}>
+            {icon} {label}
+          </Text>
+
+          {block.arguments && block.status !== "loading" && (
+            <Text size="1" style={{ color: "var(--gray-11)", fontFamily: "monospace" }}>
+              {JSON.stringify(block.arguments)}
+            </Text>
+          )}
+
+          {block.result !== undefined && (
+            <Text size="1" style={{ color: "var(--gray-10)", fontFamily: "monospace" }}>
+              → {JSON.stringify(block.result)}
+            </Text>
+          )}
+
+          {block.error && (
+            <Text size="1" style={{ color: "var(--red-11)", fontFamily: "monospace" }}>
+              {block.error}
+            </Text>
+          )}
+        </Flex>
+      </Box>
+    </Flex>
   );
 }
 
-function ChatBubble({ message }: { message: Message }) {
+function ChatBubble({ message }: { message: Message & { content: string } }) {
   const isUser = message.role === "user";
-
-  const renderContent = () => {
-    if (typeof message.content === "string") {
-      return <Text size="2">{message.content}</Text>;
-    }
-    return (
-      <Flex direction="column" gap="1">
-        {message.content.map((block, i) => {
-          if (block.type === "content" && block.format === "string") {
-            return (
-              <Text key={i} size="2">
-                {block.content as string}
-              </Text>
-            );
-          }
-          if (block.type === "tool") {
-            return <ToolPill key={block.id} block={block} />;
-          }
-          return null;
-        })}
-      </Flex>
-    );
-  };
-
   return (
     <Flex justify={isUser ? "start" : "end"}>
       <Card
@@ -83,10 +80,35 @@ function ChatBubble({ message }: { message: Message }) {
           backgroundColor: isUser ? "var(--accent-3)" : "var(--gray-3)",
         }}
       >
-        {renderContent()}
+        <Text size="2">{message.content}</Text>
       </Card>
     </Flex>
   );
+}
+
+// Splits a message with Block[] content into individual renderable elements.
+function renderMessage(msg: Message): React.ReactNode[] {
+  if (typeof msg.content === "string") {
+    return [<ChatBubble key={msg.id} message={msg as Message & { content: string }} />];
+  }
+  return msg.content
+    .map((block, i): React.ReactNode | null => {
+      if (block.type === "content" && block.format === "string") {
+        const text = block.content as string;
+        if (!text) return null;
+        return (
+          <ChatBubble
+            key={`${msg.id}-c${i}`}
+            message={{ ...msg, content: text }}
+          />
+        );
+      }
+      if (block.type === "tool") {
+        return <ToolBubble key={`${msg.id}-${block.id}`} block={block} />;
+      }
+      return null;
+    })
+    .filter((el): el is React.ReactNode => el !== null);
 }
 
 function ChatApp() {
@@ -120,7 +142,6 @@ function ChatApp() {
     };
 
     window.intelligence.onMLComplete = async (_jobId, finalSnapshot) => {
-      // Update UI with final snapshot for this turn.
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
@@ -137,7 +158,6 @@ function ChatApp() {
       );
 
       if (!pendingTool) {
-        // No tool to run — turn is done, commit to history.
         conversationRef.current = [
           ...conversationRef.current,
           { role: "assistant", content: finalSnapshot },
@@ -160,7 +180,7 @@ function ChatApp() {
         (pendingTool as ToolBlock).error = error;
       }
 
-      // Re-render pill with done/failed status (snapshot mutated in place above).
+      // Re-render bubble with done/failed status (snapshot mutated in place above).
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
@@ -169,7 +189,6 @@ function ChatApp() {
         return prev;
       });
 
-      // Commit assistant turn + tool result to history, then continue.
       conversationRef.current = [
         ...conversationRef.current,
         { role: "assistant", content: finalSnapshot },
@@ -198,7 +217,6 @@ function ChatApp() {
     const trimmed = input.trim();
     if (!trimmed) return;
 
-    // Add to authoritative history first so completion() sees it.
     const userMsg: CompletionMessage = { role: "user", content: trimmed };
     conversationRef.current = [...conversationRef.current, userMsg];
 
@@ -237,9 +255,7 @@ function ChatApp() {
       {/* Message list */}
       <Box style={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
         <Flex direction="column" gap="3">
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))}
+          {messages.flatMap((msg) => renderMessage(msg))}
           <div ref={bottomRef} />
         </Flex>
       </Box>
