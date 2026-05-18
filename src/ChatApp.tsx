@@ -10,6 +10,7 @@ import {
 } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
+import { defineTool } from "./lib/intelligence";
 
 export interface Message {
   id: string; // React key only — not sent to completion()
@@ -19,17 +20,19 @@ export interface Message {
 
 const toolStatusConfig = {
   loading: { icon: "⟳", bg: "var(--gray-3)", fg: "var(--gray-11)" },
-  ready:   { icon: "⟳", bg: "var(--blue-3)", fg: "var(--blue-11)" },
-  done:    { icon: "✓", bg: "var(--green-3)", fg: "var(--green-11)" },
-  failed:  { icon: "✗", bg: "var(--red-3)",   fg: "var(--red-11)"  },
+  ready: { icon: "⟳", bg: "var(--blue-3)", fg: "var(--blue-11)" },
+  done: { icon: "✓", bg: "var(--green-3)", fg: "var(--green-11)" },
+  failed: { icon: "✗", bg: "var(--red-3)", fg: "var(--red-11)" },
 } as const;
 
 function ToolBubble({ block }: { block: ToolBlock }) {
   const { icon, bg, fg } = toolStatusConfig[block.status];
   const label =
-    block.status === "loading" ? `${block.name}…` :
-    block.status === "ready"   ? `Führt ${block.name} aus…` :
-    block.name;
+    block.status === "loading"
+      ? `${block.name}…`
+      : block.status === "ready"
+        ? `Führt ${block.name} aus…`
+        : block.name;
 
   return (
     <Flex justify="center">
@@ -43,24 +46,37 @@ function ToolBubble({ block }: { block: ToolBlock }) {
         }}
       >
         <Flex direction="column" gap="1">
-          <Text size="1" weight="bold" style={{ color: fg, fontFamily: "monospace" }}>
+          <Text
+            size="1"
+            weight="bold"
+            style={{ color: fg, fontFamily: "monospace" }}
+          >
             {icon} {label}
           </Text>
 
           {block.arguments && block.status !== "loading" && (
-            <Text size="1" style={{ color: "var(--gray-11)", fontFamily: "monospace" }}>
+            <Text
+              size="1"
+              style={{ color: "var(--gray-11)", fontFamily: "monospace" }}
+            >
               {JSON.stringify(block.arguments)}
             </Text>
           )}
 
           {block.result !== undefined && (
-            <Text size="1" style={{ color: "var(--gray-10)", fontFamily: "monospace" }}>
+            <Text
+              size="1"
+              style={{ color: "var(--gray-10)", fontFamily: "monospace" }}
+            >
               → {JSON.stringify(block.result)}
             </Text>
           )}
 
           {block.error && (
-            <Text size="1" style={{ color: "var(--red-11)", fontFamily: "monospace" }}>
+            <Text
+              size="1"
+              style={{ color: "var(--red-11)", fontFamily: "monospace" }}
+            >
               {block.error}
             </Text>
           )}
@@ -89,7 +105,12 @@ function ChatBubble({ message }: { message: Message & { content: string } }) {
 // Splits a message with Block[] content into individual renderable elements.
 function renderMessage(msg: Message): React.ReactNode[] {
   if (typeof msg.content === "string") {
-    return [<ChatBubble key={msg.id} message={msg as Message & { content: string }} />];
+    return [
+      <ChatBubble
+        key={msg.id}
+        message={msg as Message & { content: string }}
+      />,
+    ];
   }
   return msg.content
     .map((block, i): React.ReactNode | null => {
@@ -128,6 +149,35 @@ function ChatApp() {
   }, [messages]);
 
   useEffect(() => {
+    window.intelligence.tools.get_weather_by_city = defineTool(
+      async (args: { location: string }) => {
+        try {
+          const params = new URLSearchParams();
+          params.append("q", args.location);
+          params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
+
+          const res = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?${params}`,
+          );
+
+          const data = await res.json();
+          return data["weather"][0] ?? "N/A";
+        } catch {
+          return "N/A";
+        }
+      },
+      {
+        description: "Get weather for a city.",
+        parameters: {
+          type: "object",
+          properties: {
+            location: { type: "string", description: "city" },
+          },
+          required: ["location"],
+        },
+      },
+    );
+
     window.intelligence.onMLToken = (_jobId, snapshot) => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -136,7 +186,11 @@ function ChatApp() {
         }
         return [
           ...prev,
-          { id: crypto.randomUUID(), role: "assistant" as const, content: snapshot },
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: snapshot,
+          },
         ];
       });
     };
@@ -149,7 +203,11 @@ function ChatApp() {
         }
         return [
           ...prev,
-          { id: crypto.randomUUID(), role: "assistant" as const, content: finalSnapshot },
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: finalSnapshot,
+          },
         ];
       });
 
@@ -184,7 +242,10 @@ function ChatApp() {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
-          return [...prev.slice(0, -1), { ...last, content: [...finalSnapshot] }];
+          return [
+            ...prev.slice(0, -1),
+            { ...last, content: [...finalSnapshot] },
+          ];
         }
         return prev;
       });
