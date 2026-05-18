@@ -44,17 +44,17 @@ function ChatApp() {
   useContext(IntelligenceContext);
 
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: "What is the weather in Paris?",
-    },
-    {
-      id: crypto.randomUUID(),
-      role: "system",
-      content:
-        "The weather in Paris is currently snowy with temperatures around 2°C.",
-    },
+    // {
+    //   id: crypto.randomUUID(),
+    //   role: "user",
+    //   content: "What is the weather in Paris?",
+    // },
+    // {
+    //   id: crypto.randomUUID(),
+    //   role: "system",
+    //   content:
+    //     "The weather in Paris is currently snowy with temperatures around 2°C.",
+    // },
   ]);
 
   const [jobId] = useState(() => crypto.randomUUID());
