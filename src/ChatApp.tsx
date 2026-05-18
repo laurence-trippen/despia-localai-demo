@@ -218,17 +218,23 @@ function ChatApp() {
   const [jobId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState("");
   const [owmApiKey, setOwmApiKey] = useState("");
+  const owmApiKeyRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Authoritative conversation history sent to native. Parallel to `messages`
   // state which is UI-only (carries extra React `id` fields).
   const conversationRef = useRef<CompletionMessage[]>([]);
 
+  // Keep ref in sync so the tool closure always reads the latest key
+  // without needing to re-register on every keystroke.
+  useEffect(() => {
+    owmApiKeyRef.current = owmApiKey;
+  }, [owmApiKey]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Re-register tool whenever the API key changes so the closure is always fresh.
   useEffect(() => {
     console.log("[ChatApp] registering get_weather_by_city");
     window.intelligence.tools.get_weather_by_city = defineTool(
@@ -237,7 +243,7 @@ function ChatApp() {
         try {
           const params = new URLSearchParams();
           params.append("q", args.location);
-          params.append("appId", owmApiKey);
+          params.append("appId", owmApiKeyRef.current);
 
           const res = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?${params}`,
@@ -263,7 +269,7 @@ function ChatApp() {
       },
     );
     console.log("[ChatApp] tools after register:", Object.keys(window.intelligence.tools));
-  }, [owmApiKey]);
+  }, []);
 
   useEffect(() => {
     window.intelligence.onMLToken = (_jobId, snapshot) => {
@@ -376,6 +382,18 @@ function ChatApp() {
     if (!trimmed) return;
 
     const userMsg: CompletionMessage = { role: "user", content: trimmed };
+
+    // Prepend system prompt on the very first message.
+    if (conversationRef.current.length === 0) {
+      conversationRef.current = [{
+        role: "system",
+        content:
+          "You are a helpful assistant with access to tools. " +
+          "Always use the available tools when the user asks something they can answer, " +
+          "especially for real-time data like weather.",
+      }];
+    }
+
     conversationRef.current = [...conversationRef.current, userMsg];
 
     setMessages((prev) => [
