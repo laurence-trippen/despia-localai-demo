@@ -230,8 +230,10 @@ function ChatApp() {
 
   // Re-register tool whenever the API key changes so the closure is always fresh.
   useEffect(() => {
+    console.log("[ChatApp] registering get_weather_by_city");
     window.intelligence.tools.get_weather_by_city = defineTool(
       async (args: { location: string }) => {
+        console.log("[Tool] get_weather_by_city called, args:", args);
         try {
           const params = new URLSearchParams();
           params.append("q", args.location);
@@ -242,8 +244,10 @@ function ChatApp() {
           );
 
           const data = await res.json();
+          console.log("[Tool] weather response:", data);
           return data["weather"][0] ?? "N/A";
-        } catch {
+        } catch (e) {
+          console.error("[Tool] fetch error:", e);
           return "N/A";
         }
       },
@@ -258,6 +262,7 @@ function ChatApp() {
         },
       },
     );
+    console.log("[ChatApp] tools after register:", Object.keys(window.intelligence.tools));
   }, [owmApiKey]);
 
   useEffect(() => {
@@ -279,6 +284,7 @@ function ChatApp() {
     };
 
     window.intelligence.onMLComplete = async (_jobId, finalSnapshot) => {
+      console.log("[ChatApp] onMLComplete snapshot:", JSON.stringify(finalSnapshot));
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
@@ -298,6 +304,9 @@ function ChatApp() {
         (b): b is ToolBlock => b.type === "tool" && b.status === "ready",
       );
 
+      console.log("[ChatApp] pendingTools:", pendingTools.length, pendingTools.map(t => t.name));
+      console.log("[ChatApp] registered tools:", Object.keys(window.intelligence.tools));
+
       if (pendingTools.length === 0) {
         conversationRef.current = [
           ...conversationRef.current,
@@ -309,14 +318,17 @@ function ChatApp() {
       // Execute all pending tools in parallel.
       await Promise.all(
         pendingTools.map(async (tool) => {
+          console.log("[ChatApp] dispatching:", tool.name, "args:", tool.arguments);
           try {
             const fn = window.intelligence.tools[tool.name];
             if (!fn) throw new Error(`Tool not registered: ${tool.name}`);
             tool.result = await fn(tool.arguments ?? {});
             tool.status = "done";
+            console.log("[ChatApp] tool done:", tool.name, "result:", tool.result);
           } catch (e) {
             tool.error = (e as Error).message;
             tool.status = "failed";
+            console.error("[ChatApp] tool failed:", tool.name, e);
           }
         }),
       );
@@ -412,7 +424,7 @@ function ChatApp() {
           size="1"
           style={{ color: "var(--gray-11)", whiteSpace: "nowrap" }}
         >
-          OWM API Key
+          OpenWeatherMap API Key
         </Text>
         <TextField.Root
           size="1"
@@ -437,6 +449,7 @@ function ChatApp() {
         gap="2"
         align="end"
         pt="3"
+        mb="3"
         style={{ borderTop: "1px solid var(--gray-4)" }}
       >
         <TextArea
