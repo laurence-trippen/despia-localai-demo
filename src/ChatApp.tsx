@@ -9,6 +9,7 @@ import {
   Progress,
   Text,
   TextArea,
+  TextField,
 } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
@@ -212,6 +213,7 @@ function ChatApp() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [jobId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState("");
+  const [owmApiKey, setOwmApiKey] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Authoritative conversation history sent to native. Parallel to `messages`
@@ -222,13 +224,14 @@ function ChatApp() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Re-register tool whenever the API key changes so the closure is always fresh.
   useEffect(() => {
     window.intelligence.tools.get_weather_by_city = defineTool(
       async (args: { location: string }) => {
         try {
           const params = new URLSearchParams();
           params.append("q", args.location);
-          params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
+          params.append("appId", owmApiKey);
 
           const res = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?${params}`,
@@ -251,7 +254,9 @@ function ChatApp() {
         },
       },
     );
+  }, [owmApiKey]);
 
+  useEffect(() => {
     window.intelligence.onMLToken = (_jobId, snapshot) => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -388,6 +393,21 @@ function ChatApp() {
       }}
     >
       <ModelDownloadBar />
+
+      {/* API Key input */}
+      <Flex align="center" gap="2" pb="2" mb="1" style={{ borderBottom: "1px solid var(--gray-4)" }}>
+        <Text size="1" style={{ color: "var(--gray-11)", whiteSpace: "nowrap" }}>
+          OWM API Key
+        </Text>
+        <TextField.Root
+          size="1"
+          type="password"
+          placeholder="sk-…"
+          value={owmApiKey}
+          onChange={(e) => setOwmApiKey(e.target.value)}
+          style={{ flex: 1 }}
+        />
+      </Flex>
 
       {/* Message list */}
       <Box style={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>

@@ -13,6 +13,7 @@ import {
   Spinner,
   Text,
   TextArea,
+  TextField,
 } from "@radix-ui/themes";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 
@@ -27,18 +28,18 @@ function SinglePromptApp() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [owmApiKey, setOwmApiKey] = useState("");
 
   const jobIdRef = useRef("");
 
+  // Re-register tool whenever the API key changes so the closure is always fresh.
   useEffect(() => {
-    getAllModels();
-
     window.intelligence.tools.get_weather_by_city = defineTool(
       async (args: { location: string }) => {
         try {
           const params = new URLSearchParams();
           params.append("q", args.location);
-          params.append("appId", prompt("Enter OpenWeatherMap API Key") ?? "");
+          params.append("appId", owmApiKey);
 
           const res = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?${params}`,
@@ -61,6 +62,10 @@ function SinglePromptApp() {
         },
       },
     );
+  }, [owmApiKey]);
+
+  useEffect(() => {
+    getAllModels();
 
     window.intelligence.onMLToken = (_jobId, snapshot) => {
       const textBlock = snapshot.find(
@@ -221,6 +226,19 @@ function SinglePromptApp() {
         {/* Prompt input */}
         {selectedModelId && isInstalled && (
           <Flex direction="column" gap="2">
+            <Flex align="center" gap="2">
+              <Text size="2" weight="medium" style={{ whiteSpace: "nowrap" }}>
+                OWM API Key
+              </Text>
+              <TextField.Root
+                size="2"
+                type="password"
+                placeholder="OpenWeatherMap API Key…"
+                value={owmApiKey}
+                onChange={(e) => setOwmApiKey(e.target.value)}
+                style={{ flex: 1 }}
+              />
+            </Flex>
             <Text size="2" weight="medium">
               Prompt
             </Text>
