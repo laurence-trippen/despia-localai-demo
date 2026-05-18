@@ -14,7 +14,7 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
-const MODEL_ID = "LiquidAI/LFM2-VL-450M";
+const MODEL_ID = "lfm2_vl_450m";
 
 function ModelDownloadBar() {
   const ctx = useContext(IntelligenceContext);
