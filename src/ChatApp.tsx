@@ -1,16 +1,92 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import {
   Box,
+  Button,
   Card,
   Container,
   Flex,
   IconButton,
+  Progress,
   Text,
   TextArea,
 } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
+
+const MODEL_ID = "LiquidAI/LFM2-VL-450M";
+
+function ModelDownloadBar() {
+  const ctx = useContext(IntelligenceContext);
+  const [downloadStatus, setDownloadStatus] = useState<
+    "idle" | "downloading" | "done"
+  >("idle");
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    ctx?.getInstalledModels();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    window.intelligence.onDownloadStart = () => {
+      setDownloadStatus("downloading");
+      setProgress(0);
+    };
+    window.intelligence.onDownloadProgress = (_id, p) => setProgress(p);
+    window.intelligence.onDownloadEnd = () => setDownloadStatus("done");
+    window.intelligence.onDownloadError = () => setDownloadStatus("idle");
+
+    return () => {
+      window.intelligence.onDownloadStart = undefined;
+      window.intelligence.onDownloadProgress = undefined;
+      window.intelligence.onDownloadEnd = undefined;
+      window.intelligence.onDownloadError = undefined;
+    };
+  }, []);
+
+  const isInstalled =
+    ctx?.installedModels.some((m) => m.id === MODEL_ID) ?? false;
+  const status = isInstalled ? "done" : downloadStatus;
+
+  return (
+    <Flex
+      align="center"
+      gap="2"
+      pb="2"
+      mb="1"
+      style={{ borderBottom: "1px solid var(--gray-4)" }}
+    >
+      <Text size="1" weight="medium" style={{ flex: 1, color: "var(--gray-11)" }}>
+        LFM2-VL-450M
+      </Text>
+
+      {status === "idle" && (
+        <Button
+          size="1"
+          variant="soft"
+          onClick={() => window.intelligence.downloadModel({ model: MODEL_ID })}
+        >
+          ↓ Download
+        </Button>
+      )}
+
+      {status === "downloading" && (
+        <Flex align="center" gap="2">
+          <Progress value={progress} size="1" style={{ width: "80px" }} />
+          <Text size="1" color="gray">
+            {progress}%
+          </Text>
+        </Flex>
+      )}
+
+      {status === "done" && (
+        <Text size="1" style={{ color: "var(--green-11)" }}>
+          ● Bereit
+        </Text>
+      )}
+    </Flex>
+  );
+}
 
 export interface Message {
   id: string; // React key only — not sent to completion()
@@ -133,8 +209,6 @@ function renderMessage(msg: Message): React.ReactNode[] {
 }
 
 function ChatApp() {
-  useContext(IntelligenceContext);
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [jobId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState("");
@@ -211,11 +285,11 @@ function ChatApp() {
         ];
       });
 
-      const pendingTool = finalSnapshot.find(
+      const pendingTools = finalSnapshot.filter(
         (b): b is ToolBlock => b.type === "tool" && b.status === "ready",
       );
 
-      if (!pendingTool) {
+      if (pendingTools.length === 0) {
         conversationRef.current = [
           ...conversationRef.current,
           { role: "assistant", content: finalSnapshot },
@@ -223,22 +297,22 @@ function ChatApp() {
         return;
       }
 
-      // Execute the registered tool.
-      let result: unknown;
-      let error: string | undefined;
-      try {
-        const fn = window.intelligence.tools[pendingTool.name];
-        if (!fn) throw new Error(`Tool not registered: ${pendingTool.name}`);
-        result = await fn(pendingTool.arguments ?? {});
-        pendingTool.status = "done";
-        (pendingTool as ToolBlock).result = result;
-      } catch (e) {
-        error = (e as Error).message;
-        pendingTool.status = "failed";
-        (pendingTool as ToolBlock).error = error;
-      }
+      // Execute all pending tools in parallel.
+      await Promise.all(
+        pendingTools.map(async (tool) => {
+          try {
+            const fn = window.intelligence.tools[tool.name];
+            if (!fn) throw new Error(`Tool not registered: ${tool.name}`);
+            tool.result = await fn(tool.arguments ?? {});
+            tool.status = "done";
+          } catch (e) {
+            tool.error = (e as Error).message;
+            tool.status = "failed";
+          }
+        }),
+      );
 
-      // Re-render bubble with done/failed status (snapshot mutated in place above).
+      // Re-render all bubbles with done/failed status (snapshot mutated in place above).
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
@@ -253,11 +327,11 @@ function ChatApp() {
       conversationRef.current = [
         ...conversationRef.current,
         { role: "assistant", content: finalSnapshot },
-        {
-          role: "tool",
-          tool_call_id: pendingTool.id,
-          content: JSON.stringify(error ? { error } : result),
-        },
+        ...pendingTools.map((tool) => ({
+          role: "tool" as const,
+          tool_call_id: tool.id,
+          content: JSON.stringify(tool.error ? { error: tool.error } : tool.result),
+        })),
       ];
 
       window.intelligence.completion({
@@ -313,6 +387,8 @@ function ChatApp() {
         padding: "16px",
       }}
     >
+      <ModelDownloadBar />
+
       {/* Message list */}
       <Box style={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
         <Flex direction="column" gap="3">
