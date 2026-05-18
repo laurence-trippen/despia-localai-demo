@@ -74,7 +74,7 @@ function ModelDownloadBar() {
         <Flex align="center" gap="2">
           <Progress value={progress} size="1" style={{ width: "80px" }} />
           <Text size="1" color="gray">
-            {progress}%
+            {Math.round(progress)}%
           </Text>
         </Flex>
       )}
@@ -338,7 +338,7 @@ function ChatApp() {
         id: jobId + "_" + Date.now(),
         messages: conversationRef.current,
         stream: true,
-        model: "qwen3_0_6b",
+        model: MODEL_ID,
       });
     };
 
@@ -364,7 +364,7 @@ function ChatApp() {
       id: jobId,
       messages: conversationRef.current,
       stream: true,
-      model: "qwen3_0_6b",
+      model: MODEL_ID,
     });
 
     setInput("");
