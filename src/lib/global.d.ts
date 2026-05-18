@@ -65,7 +65,7 @@ declare global {
   type CompletionMessage =
     | { role: "system" | "user"; content: string }
     | { role: "assistant"; content: string | Block[] }
-    | { role: "tool"; tool_call_id: string; content: string };
+    | { role: "tool"; content: string }; // content: JSON.stringify({ name, content: result })
 
   // --- Model ---
 

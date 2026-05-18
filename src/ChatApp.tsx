@@ -356,10 +356,10 @@ function ChatApp() {
         { role: "assistant", content: finalSnapshot },
         ...pendingTools.map((tool) => ({
           role: "tool" as const,
-          tool_call_id: tool.id,
-          content: JSON.stringify(
-            tool.error ? { error: tool.error } : tool.result,
-          ),
+          content: JSON.stringify({
+            name: tool.name,
+            content: tool.error ? { error: tool.error } : tool.result,
+          }),
         })),
       ];
 
