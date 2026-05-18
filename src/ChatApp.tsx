@@ -57,7 +57,11 @@ function ModelDownloadBar() {
       mb="1"
       style={{ borderBottom: "1px solid var(--gray-4)" }}
     >
-      <Text size="1" weight="medium" style={{ flex: 1, color: "var(--gray-11)" }}>
+      <Text
+        size="1"
+        weight="medium"
+        style={{ flex: 1, color: "var(--gray-11)" }}
+      >
         LFM2-VL-450M
       </Text>
 
@@ -335,7 +339,9 @@ function ChatApp() {
         ...pendingTools.map((tool) => ({
           role: "tool" as const,
           tool_call_id: tool.id,
-          content: JSON.stringify(tool.error ? { error: tool.error } : tool.result),
+          content: JSON.stringify(
+            tool.error ? { error: tool.error } : tool.result,
+          ),
         })),
       ];
 
@@ -395,8 +401,17 @@ function ChatApp() {
       <ModelDownloadBar />
 
       {/* API Key input */}
-      <Flex align="center" gap="2" pb="2" mb="1" style={{ borderBottom: "1px solid var(--gray-4)" }}>
-        <Text size="1" style={{ color: "var(--gray-11)", whiteSpace: "nowrap" }}>
+      <Flex
+        align="center"
+        gap="2"
+        pb="2"
+        mb="1"
+        style={{ borderBottom: "1px solid var(--gray-4)" }}
+      >
+        <Text
+          size="1"
+          style={{ color: "var(--gray-11)", whiteSpace: "nowrap" }}
+        >
           OWM API Key
         </Text>
         <TextField.Root

@@ -1,4 +1,6 @@
-import { createContext } from "react"
-import type { UseIntelligenceAPI } from "./useIntelligence"
+import { createContext } from "react";
+import type { UseIntelligenceAPI } from "./useIntelligence";
 
-export const IntelligenceContext = createContext<UseIntelligenceAPI | undefined>(undefined)
+export const IntelligenceContext = createContext<
+  UseIntelligenceAPI | undefined
+>(undefined);

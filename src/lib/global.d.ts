@@ -4,17 +4,17 @@ declare global {
   // --- Block types (snapshot elements emitted by onMLToken / onMLComplete) ---
 
   interface ContentBlock {
-    type: 'content';
-    format: 'string' | 'json';
+    type: "content";
+    format: "string" | "json";
     content: string | Record<string, unknown>;
   }
 
   interface ToolBlock {
-    type: 'tool';
+    type: "tool";
     id: string;
     name: string;
     /** Native emits 'loading' | 'ready'. JS sets 'done' | 'failed' after execution. */
-    status: 'loading' | 'ready' | 'done' | 'failed';
+    status: "loading" | "ready" | "done" | "failed";
     arguments?: Record<string, unknown>;
     result?: unknown;
     error?: string;
@@ -48,7 +48,7 @@ declare global {
 
   /** Full OpenAI-shaped tool schema — used as escape hatch in completion({ tools: [...] }). */
   interface CompletionToolSchema {
-    type: 'function';
+    type: "function";
     function: {
       name: string;
       description: string;
@@ -63,9 +63,9 @@ declare global {
   // --- Message types ---
 
   type CompletionMessage =
-    | { role: 'system' | 'user'; content: string }
-    | { role: 'assistant'; content: string | Block[] }
-    | { role: 'tool'; tool_call_id: string; content: string };
+    | { role: "system" | "user"; content: string }
+    | { role: "assistant"; content: string | Block[] }
+    | { role: "tool"; tool_call_id: string; content: string };
 
   // --- Model ---
 
@@ -109,7 +109,7 @@ declare global {
         /** Omit = all registered tools. [] = disabled. string[] = by name. Schema[] = raw. */
         tools?: Array<string | CompletionToolSchema>;
         response_format?: {
-          type: 'json_schema';
+          type: "json_schema";
           schema: Record<string, unknown>;
         };
         max_tokens?: number;
@@ -129,9 +129,9 @@ declare global {
         enable_thinking_if_supported?: boolean;
       }) => void;
 
-      listModels: (payload: { query: 'all' | 'installed' }) => void;
+      listModels: (payload: { query: "all" | "installed" }) => void;
       downloadModel: (payload: { model: string }) => void;
-      removeModel: (payload: { model: 'all' | string }) => void;
+      removeModel: (payload: { model: "all" | string }) => void;
       cancel: (payload: { id: string }) => void;
 
       // --- Inference callbacks ---

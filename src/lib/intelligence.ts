@@ -1,7 +1,4 @@
-export function defineTool<
-  TArgs extends Record<string, unknown>,
-  TResult,
->(
+export function defineTool<TArgs extends Record<string, unknown>, TResult>(
   fn: (args: TArgs) => TResult | Promise<TResult>,
   schema: ToolSchema,
 ): Tool<TArgs, TResult> {
