@@ -15,8 +15,14 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
+// Identifier passed to the native runtime on every completion() call. It must
+// match a model the on-device runtime knows about and that has been downloaded
+// (see ModelDownloadBar / window.intelligence.downloadModel below).
 const MODEL_ID = "gemma_3_1b_it";
 
+// Owns the model download/install UI. It also owns the global download callback
+// slots on window.intelligence — keep this responsibility in a single component
+// so the slots are not overwritten by another mount.
 function ModelDownloadBar() {
   const ctx = useContext(IntelligenceContext);
   const [downloadStatus, setDownloadStatus] = useState<
@@ -25,10 +31,16 @@ function ModelDownloadBar() {
   const [progress, setProgress] = useState(0);
   const lastLoggedDecile = useRef(-1);
 
+  // Ask the native runtime which models are installed. The result is delivered
+  // asynchronously and surfaced through the IntelligenceProvider context
+  // (useIntelligence wires window.intelligence.onInstalledModelsLoaded).
   useEffect(() => {
     ctx?.getInstalledModels();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Download lifecycle callbacks. These are single global slots on the bridge,
+  // not an event emitter: assign on mount, clear on unmount (return cleanup)
+  // so a remount does not leak a stale handler.
   useEffect(() => {
     window.intelligence.onDownloadStart = (modelId) => {
       console.log("[ModelDownloadBar] download start:", modelId);
@@ -240,6 +252,9 @@ function renderMessage(msg: Message): React.ReactNode[] {
 
 function ChatApp() {
   const [messages, setMessages] = useState<Message[]>([]);
+  // Correlation id sent with completion() and echoed back as the first arg of
+  // onMLToken / onMLComplete, so a handler can tell which request a snapshot
+  // belongs to. Stable for the lifetime of this chat session.
   const [jobId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState("");
   const [owmApiKey, setOwmApiKey] = useState("");
@@ -260,6 +275,11 @@ function ChatApp() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Register a tool into window.intelligence.tools — the registry the native
+  // runtime reads at completion() time. defineTool attaches the JSON-schema the
+  // model sees to the function the app runs when the model calls the tool. The
+  // closure reads owmApiKeyRef (not owmApiKey) so the latest key is used
+  // without re-registering on every keystroke.
   useEffect(() => {
     console.log("[ChatApp] registering get_weather_by_city");
     window.intelligence.tools.get_weather_by_city = defineTool(
@@ -299,6 +319,9 @@ function ChatApp() {
     );
   }, []);
 
+  // Inference callbacks. Native streams the FULL Block[] snapshot on every
+  // token (not deltas), so each update replaces the last assistant bubble
+  // rather than appending. onMLComplete then drives the tool round-trip below.
   useEffect(() => {
     window.intelligence.onMLToken = (_jobId, snapshot) => {
       setMessages((prev) => {
@@ -317,6 +340,13 @@ function ChatApp() {
       });
     };
 
+    // Turn complete. The tool round-trip works like this:
+    //   1. Native emits ToolBlock(s) with status "ready" (parsed call + args).
+    //   2. We execute each registered tool and set status "done"/"failed".
+    //   3. We append the assistant turn plus one { role: "tool" } message per
+    //      result to the conversation, then call completion() again so the
+    //      model can produce its final answer from the tool output.
+    // A turn with no pending tools is final and just gets recorded.
     window.intelligence.onMLComplete = async (_jobId, finalSnapshot) => {
       console.log(
         "[ChatApp] onMLComplete snapshot:",
@@ -422,6 +452,9 @@ function ChatApp() {
         })),
       ];
 
+      // Continue the same logical turn with tool results in context. A fresh
+      // id per round keeps native treating it as a new job while the messages
+      // array carries the full accumulated history.
       window.intelligence.completion({
         id: jobId + "_" + Date.now(),
         messages: conversationRef.current,
@@ -463,6 +496,9 @@ function ChatApp() {
       { id: crypto.randomUUID(), role: "user", content: trimmed },
     ]);
 
+    // Entry point of a turn. tools is omitted, so every tool registered in
+    // window.intelligence.tools is exposed to the model. Streamed output
+    // arrives via onMLToken; the turn ends in onMLComplete.
     window.intelligence.completion({
       id: jobId,
       messages: conversationRef.current,
