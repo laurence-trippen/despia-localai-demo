@@ -47,7 +47,7 @@ function ModelDownloadBar() {
           `[ModelDownloadBar] download progress: ${modelId} ${pct}% (raw ${p})`,
         );
       }
-      setProgress(p);
+      setProgress(p * 100);
     };
     window.intelligence.onDownloadEnd = (modelId) => {
       console.log("[ModelDownloadBar] download end:", modelId);
