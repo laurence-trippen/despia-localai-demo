@@ -23,19 +23,44 @@ function ModelDownloadBar() {
     "idle" | "downloading" | "done"
   >("idle");
   const [progress, setProgress] = useState(0);
+  const lastLoggedDecile = useRef(-1);
 
   useEffect(() => {
     ctx?.getInstalledModels();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    window.intelligence.onDownloadStart = () => {
+    window.intelligence.onDownloadStart = (modelId) => {
+      console.log("[ModelDownloadBar] download start:", modelId);
+      lastLoggedDecile.current = -1;
       setDownloadStatus("downloading");
       setProgress(0);
     };
-    window.intelligence.onDownloadProgress = (_id, p) => setProgress(p);
-    window.intelligence.onDownloadEnd = () => setDownloadStatus("done");
-    window.intelligence.onDownloadError = () => setDownloadStatus("idle");
+    window.intelligence.onDownloadProgress = (modelId, p) => {
+      // Native emits a 0–1 fraction, FakeBridge a 0–100 value — normalize
+      // to a percentage so the throttled log reads correctly either way.
+      const pct = Math.round(p <= 1 ? p * 100 : p);
+      const decile = Math.floor(pct / 10);
+      if (decile !== lastLoggedDecile.current) {
+        lastLoggedDecile.current = decile;
+        console.log(
+          `[ModelDownloadBar] download progress: ${modelId} ${pct}% (raw ${p})`,
+        );
+      }
+      setProgress(p);
+    };
+    window.intelligence.onDownloadEnd = (modelId) => {
+      console.log("[ModelDownloadBar] download end:", modelId);
+      setDownloadStatus("done");
+    };
+    window.intelligence.onDownloadError = (modelId, error) => {
+      console.error(
+        "[ModelDownloadBar] download error:",
+        modelId,
+        error,
+      );
+      setDownloadStatus("idle");
+    };
 
     return () => {
       window.intelligence.onDownloadStart = undefined;
