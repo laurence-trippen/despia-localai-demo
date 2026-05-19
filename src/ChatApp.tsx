@@ -15,7 +15,7 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
-const MODEL_ID = "gemma_3n_e4b_it";
+const MODEL_ID = "gemma_3_1b_it";
 
 function ModelDownloadBar() {
   const ctx = useContext(IntelligenceContext);
@@ -87,7 +87,7 @@ function ModelDownloadBar() {
         weight="medium"
         style={{ flex: 1, color: "var(--gray-11)" }}
       >
-        Gemma 3n E4B IT
+        Gemma 3 1B IT
       </Text>
 
       {status === "idle" && (
