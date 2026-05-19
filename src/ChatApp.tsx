@@ -352,10 +352,21 @@ function ChatApp() {
       );
 
       if (pendingTools.length === 0) {
-        conversationRef.current = [
-          ...conversationRef.current,
-          { role: "assistant", content: finalSnapshot },
-        ];
+        // Skip empty/degenerate turns: a single bad generation appended here
+        // would poison every subsequent request's context.
+        const hasMeaningfulContent = finalSnapshot.some(
+          (b) =>
+            b.type === "tool" ||
+            (b.type === "content" &&
+              typeof b.content === "string" &&
+              b.content.trim() !== ""),
+        );
+        if (hasMeaningfulContent) {
+          conversationRef.current = [
+            ...conversationRef.current,
+            { role: "assistant", content: finalSnapshot },
+          ];
+        }
         return;
       }
 
@@ -416,7 +427,6 @@ function ChatApp() {
         messages: conversationRef.current,
         stream: true,
         model: MODEL_ID,
-        force_tools: true,
         temperature: 0,
       });
     };
@@ -458,7 +468,6 @@ function ChatApp() {
       messages: conversationRef.current,
       stream: true,
       model: MODEL_ID,
-      force_tools: true,
       temperature: 0,
     });
 
