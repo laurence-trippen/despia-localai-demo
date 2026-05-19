@@ -15,7 +15,7 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
-const MODEL_ID = "lfm2_vl_450m";
+const MODEL_ID = "lfm2_2_6b";
 
 function ModelDownloadBar() {
   const ctx = useContext(IntelligenceContext);
@@ -62,7 +62,7 @@ function ModelDownloadBar() {
         weight="medium"
         style={{ flex: 1, color: "var(--gray-11)" }}
       >
-        LFM2-VL-450M
+        LFM2 2.6B
       </Text>
 
       {status === "idle" && (
