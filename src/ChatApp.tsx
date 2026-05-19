@@ -15,7 +15,7 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
-const MODEL_ID = "lfm2_2_6b";
+const MODEL_ID = "gemma_3n_e4b_it";
 
 function ModelDownloadBar() {
   const ctx = useContext(IntelligenceContext);
@@ -87,7 +87,7 @@ function ModelDownloadBar() {
         weight="medium"
         style={{ flex: 1, color: "var(--gray-11)" }}
       >
-        LFM2 2.6B
+        Gemma 3n E4B IT
       </Text>
 
       {status === "idle" && (
