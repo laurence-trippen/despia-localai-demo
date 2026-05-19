@@ -16,7 +16,7 @@ if (import.meta.env.DEV) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Theme>
+    <Theme appearance="dark">
       <IntelligenceGuard>
         <IntelligenceProvider>
           <ChatApp />

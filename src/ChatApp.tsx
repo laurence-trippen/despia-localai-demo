@@ -86,7 +86,7 @@ function ModelDownloadBar() {
 
       {status === "done" && (
         <Text size="1" style={{ color: "var(--green-11)" }}>
-          ● Bereit
+          ● Ready
         </Text>
       )}
     </Flex>
@@ -112,7 +112,7 @@ function ToolBubble({ block }: { block: ToolBlock }) {
     block.status === "loading"
       ? `${block.name}…`
       : block.status === "ready"
-        ? `Führt ${block.name} aus…`
+        ? `Running ${block.name}…`
         : block.name;
 
   return (
@@ -460,28 +460,42 @@ function ChatApp() {
       <ModelDownloadBar />
 
       {/* API Key input */}
-      <Flex
-        align="center"
-        gap="2"
-        pb="2"
-        mb="1"
-        style={{ borderBottom: "1px solid var(--gray-4)" }}
+      <Box
+        mb="2"
+        style={{
+          border: "1px solid var(--gray-5)",
+          borderRadius: "8px",
+          padding: "10px 12px",
+        }}
       >
-        <Text
-          size="1"
-          style={{ color: "var(--gray-11)", whiteSpace: "nowrap" }}
-        >
-          OpenWeatherMap API Key
-        </Text>
+        <Flex align="center" gap="2" mb="2">
+          <Box
+            style={{
+              backgroundColor: "var(--blue-4)",
+              borderRadius: "4px",
+              padding: "2px 6px",
+            }}
+          >
+            <Text size="1" weight="bold" style={{ color: "var(--blue-11)" }}>
+              🔧 Tool
+            </Text>
+          </Box>
+          <Text size="2" weight="medium" style={{ color: "var(--gray-12)" }}>
+            OpenWeatherMap Weather
+          </Text>
+        </Flex>
         <TextField.Root
-          size="1"
+          size="2"
           type="password"
-          placeholder="sk-…"
+          placeholder="Enter API key…"
           value={owmApiKey}
           onChange={(e) => setOwmApiKey(e.target.value)}
-          style={{ flex: 1 }}
+          style={{ width: "100%", fontSize: "16px" }}
         />
-      </Flex>
+        <Text size="1" mt="1" style={{ color: "var(--gray-10)", display: "block" }}>
+          Required for live weather queries
+        </Text>
+      </Box>
 
       {/* Message list */}
       <Box style={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
@@ -496,19 +510,21 @@ function ChatApp() {
         gap="2"
         align="end"
         pt="3"
-        mb="3"
-        style={{ borderTop: "1px solid var(--gray-4)" }}
+        style={{
+          borderTop: "1px solid var(--gray-4)",
+          paddingBottom: "env(safe-area-inset-bottom, 12px)",
+        }}
       >
         <TextArea
           style={{ flex: 1, resize: "none", fontSize: "16px" }}
-          placeholder="Nachricht eingeben…"
+          placeholder="Type a message…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={2}
         />
         <IconButton
-          size="3"
+          size="4"
           variant="solid"
           disabled={!input.trim()}
           onClick={sendMessage}
