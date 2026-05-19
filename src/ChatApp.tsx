@@ -368,6 +368,8 @@ function ChatApp() {
         messages: conversationRef.current,
         stream: true,
         model: MODEL_ID,
+        force_tools: true,
+        temperature: 0,
       });
     };
 
@@ -406,6 +408,8 @@ function ChatApp() {
       messages: conversationRef.current,
       stream: true,
       model: MODEL_ID,
+      force_tools: true,
+      temperature: 0,
     });
 
     setInput("");
