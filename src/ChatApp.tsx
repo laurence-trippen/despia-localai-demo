@@ -268,7 +268,10 @@ function ChatApp() {
         },
       },
     );
-    console.log("[ChatApp] tools after register:", Object.keys(window.intelligence.tools));
+    console.log(
+      "[ChatApp] tools after register:",
+      Object.keys(window.intelligence.tools),
+    );
   }, []);
 
   useEffect(() => {
@@ -290,7 +293,10 @@ function ChatApp() {
     };
 
     window.intelligence.onMLComplete = async (_jobId, finalSnapshot) => {
-      console.log("[ChatApp] onMLComplete snapshot:", JSON.stringify(finalSnapshot));
+      console.log(
+        "[ChatApp] onMLComplete snapshot:",
+        JSON.stringify(finalSnapshot),
+      );
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
@@ -310,8 +316,15 @@ function ChatApp() {
         (b): b is ToolBlock => b.type === "tool" && b.status === "ready",
       );
 
-      console.log("[ChatApp] pendingTools:", pendingTools.length, pendingTools.map(t => t.name));
-      console.log("[ChatApp] registered tools:", Object.keys(window.intelligence.tools));
+      console.log(
+        "[ChatApp] pendingTools:",
+        pendingTools.length,
+        pendingTools.map((t) => t.name),
+      );
+      console.log(
+        "[ChatApp] registered tools:",
+        Object.keys(window.intelligence.tools),
+      );
 
       if (pendingTools.length === 0) {
         conversationRef.current = [
@@ -324,13 +337,23 @@ function ChatApp() {
       // Execute all pending tools in parallel.
       await Promise.all(
         pendingTools.map(async (tool) => {
-          console.log("[ChatApp] dispatching:", tool.name, "args:", tool.arguments);
+          console.log(
+            "[ChatApp] dispatching:",
+            tool.name,
+            "args:",
+            tool.arguments,
+          );
           try {
             const fn = window.intelligence.tools[tool.name];
             if (!fn) throw new Error(`Tool not registered: ${tool.name}`);
             tool.result = await fn(tool.arguments ?? {});
             tool.status = "done";
-            console.log("[ChatApp] tool done:", tool.name, "result:", tool.result);
+            console.log(
+              "[ChatApp] tool done:",
+              tool.name,
+              "result:",
+              tool.result,
+            );
           } catch (e) {
             tool.error = (e as Error).message;
             tool.status = "failed";
@@ -387,13 +410,15 @@ function ChatApp() {
 
     // Prepend system prompt on the very first message.
     if (conversationRef.current.length === 0) {
-      conversationRef.current = [{
-        role: "system",
-        content:
-          "You are a helpful assistant with access to tools. " +
-          "Always use the available tools when the user asks something they can answer, " +
-          "especially for real-time data like weather.",
-      }];
+      conversationRef.current = [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant. Answer general knowledge questions directly " +
+            "from your own knowledge. Only call tools for real-time data you cannot know " +
+            "yourself, such as current weather.",
+        },
+      ];
     }
 
     conversationRef.current = [...conversationRef.current, userMsg];
