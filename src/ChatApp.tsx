@@ -7,6 +7,7 @@ import {
   Flex,
   IconButton,
   Progress,
+  Select,
   Text,
   TextArea,
   TextField,
@@ -15,27 +16,34 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { IntelligenceContext } from "./lib/IntelligenceContext";
 import { defineTool } from "./lib/intelligence";
 
-// Identifier passed to the native runtime on every completion() call. It must
-// match a model the on-device runtime knows about and that has been downloaded
-// (see ModelDownloadBar / window.intelligence.downloadModel below).
-const MODEL_ID = "gemma_3_1b_it";
-
-// Owns the model download/install UI. It also owns the global download callback
-// slots on window.intelligence — keep this responsibility in a single component
-// so the slots are not overwritten by another mount.
-function ModelDownloadBar() {
+// Owns the model picker + download/install UI. It also owns the global download
+// callback slots on window.intelligence — keep this responsibility in a single
+// component so the slots are not overwritten by another mount.
+//
+// The selected model id is lifted to ChatApp (it is needed by completion()),
+// passed in as `selectedModel` with `onSelect` to change it. Only installed
+// models can be used for chat; the rest expose a Download button.
+function ModelSelector({
+  selectedModel,
+  onSelect,
+}: {
+  selectedModel: string;
+  onSelect: (id: string) => void;
+}) {
   const ctx = useContext(IntelligenceContext);
-  const [downloadStatus, setDownloadStatus] = useState<
-    "idle" | "downloading" | "done"
-  >("idle");
+  // The model id currently downloading ("" when idle). Keyed by id — not a
+  // generic flag — so switching the picker to a different not-installed model
+  // does not inherit a stale "downloading"/"done" state from another model.
+  const [downloadingId, setDownloadingId] = useState("");
   const [progress, setProgress] = useState(0);
   const lastLoggedDecile = useRef(-1);
 
-  // Ask the native runtime which models are installed. The result is delivered
-  // asynchronously and surfaced through the IntelligenceProvider context
-  // (useIntelligence wires window.intelligence.onInstalledModelsLoaded).
+  // Ask the native runtime for both the installed list and the full catalog.
+  // Results are delivered asynchronously and surfaced through the
+  // IntelligenceProvider context (useIntelligence wires the *ModelsLoaded slots).
   useEffect(() => {
     ctx?.getInstalledModels();
+    ctx?.getAllModels();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Download lifecycle callbacks. These are single global slots on the bridge,
@@ -43,9 +51,9 @@ function ModelDownloadBar() {
   // so a remount does not leak a stale handler.
   useEffect(() => {
     window.intelligence.onDownloadStart = (modelId) => {
-      console.log("[ModelDownloadBar] download start:", modelId);
+      console.log("[ModelSelector] download start:", modelId);
       lastLoggedDecile.current = -1;
-      setDownloadStatus("downloading");
+      setDownloadingId(modelId);
       setProgress(0);
     };
     window.intelligence.onDownloadProgress = (modelId, p) => {
@@ -56,22 +64,21 @@ function ModelDownloadBar() {
       if (decile !== lastLoggedDecile.current) {
         lastLoggedDecile.current = decile;
         console.log(
-          `[ModelDownloadBar] download progress: ${modelId} ${pct}% (raw ${p})`,
+          `[ModelSelector] download progress: ${modelId} ${pct}% (raw ${p})`,
         );
       }
       setProgress(p * 100);
     };
     window.intelligence.onDownloadEnd = (modelId) => {
-      console.log("[ModelDownloadBar] download end:", modelId);
-      setDownloadStatus("done");
+      console.log("[ModelSelector] download end:", modelId);
+      setDownloadingId("");
+      // Refresh the installed list so the just-downloaded model flips to "Ready"
+      // and becomes selectable for chat.
+      ctx?.getInstalledModels();
     };
     window.intelligence.onDownloadError = (modelId, error) => {
-      console.error(
-        "[ModelDownloadBar] download error:",
-        modelId,
-        error,
-      );
-      setDownloadStatus("idle");
+      console.error("[ModelSelector] download error:", modelId, error);
+      setDownloadingId("");
     };
 
     return () => {
@@ -80,11 +87,16 @@ function ModelDownloadBar() {
       window.intelligence.onDownloadEnd = undefined;
       window.intelligence.onDownloadError = undefined;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const models = ctx?.availableModels ?? [];
   const isInstalled =
-    ctx?.installedModels.some((m) => m.id === MODEL_ID) ?? false;
-  const status = isInstalled ? "done" : downloadStatus;
+    ctx?.installedModels.some((m) => m.id === selectedModel) ?? false;
+  const status = isInstalled
+    ? "done"
+    : downloadingId === selectedModel && selectedModel
+      ? "downloading"
+      : "idle";
 
   return (
     <Flex
@@ -94,19 +106,37 @@ function ModelDownloadBar() {
       mb="1"
       style={{ borderBottom: "1px solid var(--gray-4)" }}
     >
-      <Text
+      <Select.Root
+        value={selectedModel || undefined}
+        onValueChange={onSelect}
         size="1"
-        weight="medium"
-        style={{ flex: 1, color: "var(--gray-11)" }}
       >
-        Gemma 3 1B IT
-      </Text>
+        <Select.Trigger
+          placeholder="Select a model…"
+          style={{ flex: 1 }}
+        />
+        <Select.Content>
+          {models.map((m) => {
+            const installed =
+              ctx?.installedModels.some((im) => im.id === m.id) ?? false;
+            return (
+              <Select.Item key={m.id} value={m.id}>
+                {m.name}
+                {installed ? " ●" : ""}
+              </Select.Item>
+            );
+          })}
+        </Select.Content>
+      </Select.Root>
 
       {status === "idle" && (
         <Button
           size="1"
           variant="soft"
-          onClick={() => window.intelligence.downloadModel({ model: MODEL_ID })}
+          disabled={!selectedModel}
+          onClick={() =>
+            window.intelligence.downloadModel({ model: selectedModel })
+          }
         >
           ↓ Download
         </Button>
@@ -260,6 +290,33 @@ function ChatApp() {
   const [owmApiKey, setOwmApiKey] = useState("");
   const owmApiKeyRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const ctx = useContext(IntelligenceContext);
+
+  // The user's explicit model choice ("" until they pick one). The effective
+  // selection is derived below so we can fall back to a sensible default once
+  // the model lists arrive without storing it via a setState-in-effect.
+  const [modelChoice, setModelChoice] = useState("");
+
+  // Effective model id sent to native on every completion() call: the explicit
+  // choice if any, otherwise an installed model, otherwise the first in the
+  // catalog. Derived (not stored) so it tracks the lists automatically.
+  const selectedModel =
+    modelChoice ||
+    ctx?.installedModels[0]?.id ||
+    ctx?.availableModels[0]?.id ||
+    "";
+
+  // The ref mirrors the effective selection so the onMLComplete closure (which
+  // only depends on [jobId]) always reads the latest model instead of a stale
+  // capture — same pattern as owmApiKeyRef below.
+  const selectedModelRef = useRef("");
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
+
+  const isSelectedInstalled =
+    ctx?.installedModels.some((m) => m.id === selectedModel) ?? false;
 
   // Authoritative conversation history sent to native. Parallel to `messages`
   // state which is UI-only (carries extra React `id` fields).
@@ -459,7 +516,7 @@ function ChatApp() {
         id: jobId + "_" + Date.now(),
         messages: conversationRef.current,
         stream: true,
-        model: MODEL_ID,
+        model: selectedModelRef.current,
         temperature: 0,
       });
     };
@@ -473,6 +530,8 @@ function ChatApp() {
   const sendMessage = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+    // Guard: never call completion() with a model that is not installed.
+    if (!isSelectedInstalled) return;
 
     const userMsg: CompletionMessage = { role: "user", content: trimmed };
 
@@ -503,7 +562,7 @@ function ChatApp() {
       id: jobId,
       messages: conversationRef.current,
       stream: true,
-      model: MODEL_ID,
+      model: selectedModelRef.current,
       temperature: 0,
     });
 
@@ -527,7 +586,10 @@ function ChatApp() {
         padding: "16px",
       }}
     >
-      <ModelDownloadBar />
+      <ModelSelector
+        selectedModel={selectedModel}
+        onSelect={setModelChoice}
+      />
 
       {/* API Key input */}
       <Box
@@ -596,7 +658,7 @@ function ChatApp() {
         <IconButton
           size="4"
           variant="solid"
-          disabled={!input.trim()}
+          disabled={!input.trim() || !isSelectedInstalled}
           onClick={sendMessage}
         >
           <PaperPlaneIcon />
